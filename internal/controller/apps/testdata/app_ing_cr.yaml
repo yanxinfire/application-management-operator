@@ -1,0 +1,15 @@
+apiVersion: apps.xinyan.cn/v1alpha1
+kind: Application
+metadata:
+  labels:
+    app.kubernetes.io/name: application-management-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: application-sample
+spec:
+  image: nginx
+  port: 80
+  replicas: 2
+  expose:
+    mode: Ingress
+    ingressDomain: www.nginx-test.com
+    servicePort: 80
