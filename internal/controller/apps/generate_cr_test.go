@@ -1,88 +1,64 @@
 package apps
 
 import (
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/yanxinfire/application-management-operator/api/apps/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-func TestNewDeployment(t *testing.T) {
-	type args struct {
-		app v1alpha1.Application
+func newResource[T any](filename string) *T {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		panic(err)
 	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *appsv1.Deployment
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+
+	var obj T
+	if err := yaml.Unmarshal(b, &obj); err != nil {
+		panic(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewDeployment(tt.args.app)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewDeployment() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewDeployment() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	return &obj
 }
 
-func TestNewService(t *testing.T) {
+func TestNewResourceFromTemplate(t *testing.T) {
 	type args struct {
-		app v1alpha1.Application
+		templateName string
+		app          *v1alpha1.Application
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    *corev1.Service
-		wantErr bool
+		name string
+		args args
+		want *appsv1.Deployment
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Test Ingress Application",
+			args: args{
+				app: newResource[v1alpha1.Application](
+					"testdata/app_ing_cr.yaml"),
+				templateName: "deployment",
+			},
+			want: newResource[appsv1.Deployment](
+				"testdata/deploy_ing_expect.yaml"),
+		},
+		{
+			name: "Test NodePort Application",
+			args: args{
+				templateName: "deployment",
+				app: newResource[v1alpha1.Application](
+					"testdata/app_np_cr.yaml"),
+			},
+			want: newResource[appsv1.Deployment](
+				"testdata/deploy_np_expect.yaml"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewService(tt.args.app)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewService() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewService() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestNewIngress(t *testing.T) {
-	type args struct {
-		app v1alpha1.Application
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *networkingv1.Ingress
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewIngress(tt.args.app)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewIngress() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewIngress() = %v, want %v", got, tt.want)
+			if got := NewResourceFromTemplate[appsv1.Deployment](
+				tt.args.templateName, tt.args.app); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewResourceFromTemplate() = %v, want %v", got, tt.want)
 			}
 		})
 	}

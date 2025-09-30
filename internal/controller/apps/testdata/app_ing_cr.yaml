@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: application-management-operator
     app.kubernetes.io/managed-by: kustomize
-  name: application-sample
+  name: my-test-ing
 spec:
   image: nginx
   port: 80
