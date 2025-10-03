@@ -61,6 +61,7 @@ type ApplicationSpec struct {
 // Expose defines a service which exposes an application
 type Expose struct {
 	// Mode defines the service mode, nodePort or ingress
+	// +kubebuilder:validation:Enum=Ingress;NodePort
 	Mode string `json:"mode"`
 
 	// IngressDomain refers to domain name used as host in ingress
@@ -69,6 +70,8 @@ type Expose struct {
 
 	// NodePort is a node port number for nodePort service
 	// +optional
+	// +kubebuilder:validation:Minimum=30000
+	// +kubebuilder:validation:Maximum=32767
 	NodePort int32 `json:"nodePort,omitempty"`
 
 	// ServicePort is a port number used by the service

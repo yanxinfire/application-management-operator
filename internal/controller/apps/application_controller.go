@@ -19,13 +19,15 @@ package apps
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
-	//corev1 "k8s.io/api/core/v1"
-	//networkingv1 "k8s.io/api/networking/v1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -37,6 +39,7 @@ import (
 type ApplicationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	logger logr.Logger
 }
 
 // +kubebuilder:rbac:groups=apps.xinyan.cn,resources=applications,verbs=get;list;watch;create;update;patch;delete
@@ -53,30 +56,22 @@ type ApplicationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := logf.FromContext(ctx, "Application", req.NamespacedName)
+	r.logger = logf.FromContext(ctx, "Application", req.NamespacedName)
 
 	app := &appsv1alpha1.Application{}
 	if err := r.Get(ctx, req.NamespacedName, app); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, req.NamespacedName, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			r.createDeployment()
-		} else {
-			logger.Error(err, "Deployment not found")
-			return ctrl.Result{}, err
-		}
-	} else {
-		r.updateDeployment()
+	if err := r.verifyApplicationMode(app); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	if app.Spec.Expose.Mode == "Ingress" {
-		r.createOrUpdateIngress()
-	} else if app.Spec.Expose.Mode == "NodePort" {
-		r.createOrUpdateNodePortService()
-	} else {
-		return ctrl.Result{}, fmt.Errorf("expose mode %s is not supported", app.Spec.Expose.Mode)
+	if err := r.createOrUpdateDeployment(ctx, app); err != nil {
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+
+	if err := r.createOrUpdateService(ctx, app); err != nil {
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -90,103 +85,71 @@ func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ApplicationReconciler) createDeployment() {
-
+func (r *ApplicationReconciler) createOrUpdateDeployment(
+	ctx context.Context, app *appsv1alpha1.Application) error {
+	deployment := NewDeployment(app)
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: app.Namespace,
+		Name:      app.Name,
+	}, &appsv1.Deployment{}); err != nil {
+		if errors.IsNotFound(err) {
+			return r.Create(ctx, deployment)
+		}
+		return err
+	}
+	return r.Update(ctx, deployment)
 }
 
-func (r *ApplicationReconciler) updateDeployment() {
-
+func (r *ApplicationReconciler) createOrUpdateService(
+	ctx context.Context, app *appsv1alpha1.Application) error {
+	service := NewService(app)
+	if app.Spec.Expose.Mode == "Ingress" {
+		return r.createOrUpdateIngress(ctx, app)
+	}
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: app.Namespace,
+		Name:      app.Name,
+	}, &corev1.Service{}); err != nil {
+		if errors.IsNotFound(err) {
+			return r.Create(ctx, service)
+		}
+		return err
+	}
+	return r.Update(ctx, service)
 }
 
-func (r *ApplicationReconciler) createOrUpdateIngress() {
-
+func (r *ApplicationReconciler) createOrUpdateIngress(
+	ctx context.Context, app *appsv1alpha1.Application) error {
+	ingress := NewService(app)
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: app.Namespace,
+		Name:      app.Name,
+	}, &networkingv1.Ingress{}); err != nil {
+		if errors.IsNotFound(err) {
+			return r.Create(ctx, ingress)
+		}
+		return err
+	}
+	return r.Update(ctx, ingress)
 }
 
-func (r *ApplicationReconciler) createOrUpdateNodePortService() {
-
+func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Application) error {
+	expose := app.Spec.Expose
+	if expose.Mode == "Ingress" {
+		if expose.IngressDomain == "" {
+			return fmt.Errorf("mode is Ingress but ingressDomain is empty")
+		}
+	} else if expose.Mode == "NodePort" {
+		if expose.NodePort == 0 {
+			r.logger.Info("mode is NodePort and nodePort is not set, " +
+				"nodePort will be a random number between 30000 and 32767")
+		}
+		if expose.NodePort < 30000 || expose.NodePort > 32767 {
+			return fmt.Errorf("invalid NodePort %d, "+
+				"must be between 30000–32767", expose.NodePort)
+		}
+	} else {
+		return fmt.Errorf("expose mode %s is not supported", expose.Mode)
+	}
+	return nil
 }
-
-//func (r *ApplicationReconciler) createOrUpdateIngress(ctx context.Context, req ctrl.Request, expose appsv1alpha1.Expose) error {
-//	ing := &networkingv1.Ingress{}
-//	if err := r.Get(ctx, req.NamespacedName, ing); err != nil {
-//		if errors.IsNotFound(err) {
-//			return r.createIngress(ctx, req, expose)
-//		} else {
-//			return err
-//		}
-//	}
-//	return r.updateIngress(ctx, req, ing.DeepCopy())
-//}
-//
-//func (r *ApplicationReconciler) createOrUpdateNodePortService() {
-//
-//}
-
-//func (r *ApplicationReconciler) createIngress(ctx context.Context, req ctrl.Request, expose appsv1alpha1.Expose) error {
-//
-//	svc := &corev1.Service{}
-//	if err := r.Get(ctx, req.NamespacedName, svc); err != nil {
-//		if errors.IsNotFound(err) {
-//			return r.createService(ctx, req, expose)
-//		} else {
-//			return err
-//		}
-//	}
-//	ing := &networkingv1.Ingress{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      req.Name,
-//			Namespace: req.Namespace,
-//		},
-//		Spec: networkingv1.IngressSpec{
-//			Rules: []networkingv1.IngressRule{
-//				{
-//					Host: expose.IngressDomain,
-//					IngressRuleValue: networkingv1.IngressRuleValue{
-//						HTTP: &networkingv1.HTTPIngressRuleValue{
-//							Paths: []networkingv1.HTTPIngressPath{
-//								{
-//									Path: "/",
-//									Backend: networkingv1.IngressBackend{
-//										Service: &networkingv1.IngressServiceBackend{
-//											Name: req.Name,
-//										},
-//									},
-//								},
-//							},
-//						},
-//					},
-//				},
-//			},
-//		},
-//	}
-//	return r.Create(ctx, ing)
-//}
-//
-//func (r *ApplicationReconciler) updateIngress(ctx context.Context, req ctrl.Request, deepCopy *networkingv1.Ingress) error {
-//	ing := networkingv1.Ingress{}
-//	err := r.Create(ctx, &ing)
-//	if err != nil {
-//		return err
-//	}
-//}
-//
-//func (r *ApplicationReconciler) createService(ctx context.Context, req ctrl.Request, expose appsv1alpha1.Expose) error {
-//	svc := &corev1.Service{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      req.Name,
-//			Namespace: req.Namespace,
-//		},
-//		Spec: corev1.ServiceSpec{
-//			Ports: []corev1.ServicePort{
-//				{
-//					Name: "http",
-//					Port: expose.ServicePort,
-//				},
-//			},
-//		},
-//	}
-//	if expose.Mode == "NodePort" {
-//		svc.Spec.Ports[0].NodePort = expose.NodePort
-//	}
-//	return r.Create(ctx, svc)
-//}
