@@ -4,6 +4,7 @@ metadata:
   name: my-test-ing
   labels:
     app: my-test-ing
+  namespace: my-test
 spec:
   replicas: 2
   selector:
@@ -20,6 +21,6 @@ spec:
           image: nginx
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80
+            - name: "http"
+              containerPort: 80
               protocol: TCP
-      restartPolicy: Always

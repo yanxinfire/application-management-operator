@@ -170,11 +170,16 @@ spec:
                       in ingress
                     type: string
                   mode:
-                    description: Mode defines the service mode, nodePort or ingress
+                    description: Mode defines the service mode, NodePort or Ingress
+                    enum:
+                    - Ingress
+                    - NodePort
                     type: string
                   nodePort:
                     description: NodePort is a node port number for nodePort service
                     format: int32
+                    maximum: 32767
+                    minimum: 30000
                     type: integer
                   servicePort:
                     description: ServicePort is a port number used by the service

@@ -5,6 +5,7 @@ metadata:
     app.kubernetes.io/name: application-management-operator
     app.kubernetes.io/managed-by: kustomize
   name: my-test-np
+  namespace: my-test
 spec:
   image: nginx
   port: 80

@@ -60,7 +60,7 @@ type ApplicationSpec struct {
 
 // Expose defines a service which exposes an application
 type Expose struct {
-	// Mode defines the service mode, nodePort or ingress
+	// Mode defines the service mode, NodePort or Ingress
 	// +kubebuilder:validation:Enum=Ingress;NodePort
 	Mode string `json:"mode"`
 

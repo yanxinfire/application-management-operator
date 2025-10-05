@@ -4,6 +4,7 @@ metadata:
   name: my-test-np
   labels:
     app: my-test-np
+  namespace: my-test
 spec:
   replicas: 2
   selector:

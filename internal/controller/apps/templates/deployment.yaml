@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .ObjectMeta.Name }}
+  namespace: {{ .ObjectMeta.Namespace }}
   labels:
     app: {{ .ObjectMeta.Name }}
 spec:
@@ -20,7 +21,7 @@ spec:
           image: {{ .Spec.Image }}
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: {{ .Spec.Port }}
+            - name: http
+              containerPort: {{ .Spec.Port }}
               protocol: TCP
-      restartPolicy: Always
       

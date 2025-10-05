@@ -42,7 +42,10 @@ func NewDeployment(app *v1alpha1.Application) *appsv1.Deployment {
 			},
 			Replicas: app.Spec.Replicas,
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metaData,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   metaData.GetName(),
+					Labels: metaData.GetLabels(),
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -90,9 +93,6 @@ func NewService(app *v1alpha1.Application) *corev1.Service {
 
 func NewIngress(app *v1alpha1.Application) *networkingv1.Ingress {
 	metaData := NewMetadata(app)
-	metaData.SetAnnotations(map[string]string{
-		"kubernetes.io/ingress.class": "nginx",
-	})
 	ingClass := "nginx"
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metaData,
