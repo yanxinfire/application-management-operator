@@ -5,6 +5,7 @@ metadata:
   namespace: my-test
   labels:
     app: my-test-ing
+    owner: xin_yan
 spec:
   ingressClassName: nginx
   rules:

@@ -3,6 +3,7 @@ package apps
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"text/template"
 
 	"github.com/yanxinfire/application-management-operator/api/apps/v1alpha1"
@@ -35,10 +36,16 @@ func NewResourceFromTemplate[T any](templateName string, app *v1alpha1.Applicati
 func NewDeployment(app *v1alpha1.Application) *appsv1.Deployment {
 	metaData := NewMetadata(app)
 	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
 		ObjectMeta: metaData,
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: metaData.GetLabels(),
+				MatchLabels: map[string]string{
+					"app": app.Name,
+				},
 			},
 			Replicas: app.Spec.Replicas,
 			Template: corev1.PodTemplateSpec{
@@ -71,11 +78,17 @@ func NewDeployment(app *v1alpha1.Application) *appsv1.Deployment {
 func NewService(app *v1alpha1.Application) *corev1.Service {
 	metaData := NewMetadata(app)
 	service := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metaData,
 		Spec: corev1.ServiceSpec{
-			Selector: metaData.GetLabels(),
-			Ports:    []corev1.ServicePort{},
-			Type:     corev1.ServiceTypeClusterIP,
+			Selector: map[string]string{
+				"app": app.Name,
+			},
+			Ports: []corev1.ServicePort{},
+			Type:  corev1.ServiceTypeClusterIP,
 		},
 	}
 	port := corev1.ServicePort{
@@ -95,6 +108,10 @@ func NewIngress(app *v1alpha1.Application) *networkingv1.Ingress {
 	metaData := NewMetadata(app)
 	ingClass := "nginx"
 	ingress := &networkingv1.Ingress{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Ingress",
+			APIVersion: "networking.k8s.io/v1",
+		},
 		ObjectMeta: metaData,
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingClass,
@@ -127,6 +144,8 @@ func NewMetadata(app *v1alpha1.Application) metav1.ObjectMeta {
 	labels := map[string]string{
 		"app": app.Name,
 	}
+	delete(app.Labels, "app")
+	maps.Copy(labels, app.Labels)
 	return metav1.ObjectMeta{
 		Name:      app.Name,
 		Namespace: app.Namespace,

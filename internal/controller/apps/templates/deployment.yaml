@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .ObjectMeta.Namespace }}
   labels:
     app: {{ .ObjectMeta.Name }}
+    owner: xin_yan
 spec:
   replicas: {{ .Spec.Replicas }}
   selector:
@@ -15,6 +16,7 @@ spec:
       name: {{ .ObjectMeta.Name }}
       labels:
         app: {{ .ObjectMeta.Name }}
+        owner: xin_yan
     spec:
       containers:
         - name: {{ .ObjectMeta.Name }}

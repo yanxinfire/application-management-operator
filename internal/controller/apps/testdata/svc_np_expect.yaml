@@ -5,6 +5,7 @@ metadata:
   namespace: my-test
   labels:
     app: my-test-np
+    owner: xin_yan
 spec:
   selector:
     app: my-test-np

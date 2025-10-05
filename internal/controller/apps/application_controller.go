@@ -25,11 +25,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/yanxinfire/application-management-operator/api/apps/v1alpha1"
@@ -62,75 +64,145 @@ func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err := r.Get(ctx, req.NamespacedName, app); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if err := r.verifyApplicationMode(app); err != nil {
+	appCopy := app.DeepCopy()
+
+	if err := r.verifyApplicationMode(appCopy); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createOrUpdateDeployment(ctx, app); err != nil {
+	if err := r.createOrUpdateDeployment(ctx, appCopy); err != nil {
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
-	if err := r.createOrUpdateService(ctx, app); err != nil {
+	if err := r.createOrUpdateService(ctx, appCopy); err != nil {
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+	if app.Spec.Expose.Mode == "Ingress" {
+		if err := r.createOrUpdateIngress(ctx, appCopy); err != nil {
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+		}
+	} else {
+		if err := r.deleteIngress(ctx, appCopy); err != nil {
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Application{}).
-		Named("apps-application").
-		Complete(r)
-}
-
 func (r *ApplicationReconciler) createOrUpdateDeployment(
 	ctx context.Context, app *appsv1alpha1.Application) error {
 	deployment := NewDeployment(app)
-	if err := r.Get(ctx, types.NamespacedName{
+	err := controllerutil.SetControllerReference(app, deployment, r.Scheme)
+	if err != nil {
+		return err
+	}
+	existingDeployment := &appsv1.Deployment{}
+	if err = r.Get(ctx, types.NamespacedName{
 		Namespace: app.Namespace,
 		Name:      app.Name,
-	}, &appsv1.Deployment{}); err != nil {
+	}, existingDeployment); err != nil {
 		if errors.IsNotFound(err) {
+			r.logger.Info("Creating Deployment", "Namespace",
+				app.Namespace, "Name", app.Name)
 			return r.Create(ctx, deployment)
 		}
 		return err
 	}
-	return r.Update(ctx, deployment)
+
+	// Utilise --dry-run='client' to update deployment unsetting properties,
+	// so that it could be compared with existing deployment correctly
+	err = r.Update(ctx, deployment, client.DryRunAll)
+	if err != nil {
+		return err
+	}
+	if !equality.Semantic.DeepEqual(deployment.Spec, existingDeployment.Spec) {
+		r.logger.Info("Updating Deployment", "Namespace",
+			app.Namespace, "Name", app.Name)
+		return r.Update(ctx, deployment)
+	}
+	return nil
 }
 
 func (r *ApplicationReconciler) createOrUpdateService(
 	ctx context.Context, app *appsv1alpha1.Application) error {
 	service := NewService(app)
-	if app.Spec.Expose.Mode == "Ingress" {
-		return r.createOrUpdateIngress(ctx, app)
+	err := controllerutil.SetControllerReference(app, service, r.Scheme)
+	if err != nil {
+		return err
 	}
-	if err := r.Get(ctx, types.NamespacedName{
+	existingService := &corev1.Service{}
+	if err = r.Get(ctx, types.NamespacedName{
 		Namespace: app.Namespace,
 		Name:      app.Name,
-	}, &corev1.Service{}); err != nil {
+	}, existingService); err != nil {
 		if errors.IsNotFound(err) {
-			return r.Create(ctx, service)
+			r.logger.Info("Creating Service", "Namespace",
+				app.Namespace, "Name", app.Name)
+			return r.Create(ctx, service, client.FieldOwner(app.Name))
 		}
 		return err
 	}
-	return r.Update(ctx, service)
+
+	err = r.Update(ctx, service, client.DryRunAll)
+	if err != nil {
+		return err
+	}
+	if !equality.Semantic.DeepEqual(service.Spec, existingService.Spec) {
+		r.logger.Info("Updating Service", "Namespace",
+			app.Namespace, "Name", app.Name)
+		return r.Update(ctx, service, client.FieldOwner(app.Name))
+	}
+	return nil
 }
 
 func (r *ApplicationReconciler) createOrUpdateIngress(
 	ctx context.Context, app *appsv1alpha1.Application) error {
-	ingress := NewService(app)
-	if err := r.Get(ctx, types.NamespacedName{
+	ingress := NewIngress(app)
+	err := controllerutil.SetControllerReference(app, ingress, r.Scheme)
+	if err != nil {
+		return err
+	}
+
+	existingIngress := &networkingv1.Ingress{}
+	if err = r.Get(ctx, types.NamespacedName{
 		Namespace: app.Namespace,
 		Name:      app.Name,
-	}, &networkingv1.Ingress{}); err != nil {
+	}, existingIngress); err != nil {
 		if errors.IsNotFound(err) {
+			r.logger.Info("Creating Ingress", "Namespace",
+				app.Namespace, "Name", app.Name)
 			return r.Create(ctx, ingress)
 		}
 		return err
 	}
-	return r.Update(ctx, ingress)
+
+	err = r.Update(ctx, ingress, client.DryRunAll)
+	if err != nil {
+		return err
+	}
+	if !equality.Semantic.DeepEqual(ingress.Spec, existingIngress.Spec) {
+		r.logger.Info("Updating Ingress", "Namespace",
+			app.Namespace, "Name", app.Name)
+		return r.Update(ctx, ingress)
+	}
+	return nil
+}
+
+func (r *ApplicationReconciler) deleteIngress(ctx context.Context, app *appsv1alpha1.Application) error {
+	ingress := &networkingv1.Ingress{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: app.Namespace,
+		Name:      app.Name,
+	}, ingress); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	r.logger.Info("Deleting Ingress", "Namespace",
+		app.Namespace, "Name", app.Name)
+	return r.Delete(ctx, ingress)
 }
 
 func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Application) error {
@@ -152,4 +224,15 @@ func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Applicat
 		return fmt.Errorf("expose mode %s is not supported", expose.Mode)
 	}
 	return nil
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1alpha1.Application{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&networkingv1.Ingress{}).
+		Named("apps-application").
+		Complete(r)
 }

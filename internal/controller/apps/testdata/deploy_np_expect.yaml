@@ -4,6 +4,7 @@ metadata:
   name: my-test-np
   labels:
     app: my-test-np
+    owner: xin_yan
   namespace: my-test
 spec:
   replicas: 2
@@ -15,6 +16,7 @@ spec:
       name: my-test-np
       labels:
         app: my-test-np
+        owner: xin_yan
     spec:
       containers:
         - name: my-test-np

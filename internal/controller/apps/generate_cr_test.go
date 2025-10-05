@@ -79,13 +79,8 @@ func TestNewDeployment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewDeployment(tt.args.app)
-			if !equality.Semantic.DeepEqual(got.Spec, tt.want.Spec) {
-				t.Errorf("got %v, want %v",
-					got.Spec, tt.want.Spec)
-			}
-			if !equality.Semantic.DeepEqual(got.ObjectMeta, tt.want.ObjectMeta) {
-				t.Errorf("want %v, want %v",
-					got.ObjectMeta, tt.want.ObjectMeta)
+			if !equality.Semantic.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -122,13 +117,8 @@ func TestNewService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewService(tt.args.app)
-			if !equality.Semantic.DeepEqual(got.Spec, tt.want.Spec) {
-				t.Errorf("got %v, want %v",
-					got.Spec, tt.want.Spec)
-			}
-			if !equality.Semantic.DeepEqual(got.ObjectMeta, tt.want.ObjectMeta) {
-				t.Errorf("got %v, want %v",
-					got.ObjectMeta, tt.want.ObjectMeta)
+			if !equality.Semantic.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -156,13 +146,8 @@ func TestNewIngress(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewIngress(tt.args.app)
-			if !equality.Semantic.DeepEqual(got.Spec, tt.want.Spec) {
-				t.Errorf("got %v, want %v",
-					got.Spec, tt.want.Spec)
-			}
-			if !equality.Semantic.DeepEqual(got.ObjectMeta, tt.want.ObjectMeta) {
-				t.Errorf("got %v, want %v",
-					got.ObjectMeta, tt.want.ObjectMeta)
+			if !equality.Semantic.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -187,7 +172,8 @@ func TestNewMetadata(t *testing.T) {
 				Name:      "my-test-ing",
 				Namespace: "my-test",
 				Labels: map[string]string{
-					"app": "my-test-ing",
+					"app":   "my-test-ing",
+					"owner": "xin_yan",
 				},
 			},
 		},

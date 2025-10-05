@@ -2,8 +2,7 @@ apiVersion: apps.xinyan.cn/v1alpha1
 kind: Application
 metadata:
   labels:
-    app.kubernetes.io/name: application-management-operator
-    app.kubernetes.io/managed-by: kustomize
+    owner: xin_yan
   name: my-test-ing
   namespace: my-test
 spec:
