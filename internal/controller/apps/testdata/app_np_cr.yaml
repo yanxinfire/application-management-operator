@@ -1,0 +1,15 @@
+apiVersion: apps.xinyan.cn/v1alpha1
+kind: Application
+metadata:
+  labels:
+    owner: xin_yan
+  name: my-test-np
+  namespace: my-test
+spec:
+  image: nginx
+  port: 80
+  replicas: 2
+  expose:
+    mode: NodePort
+    nodePort: 30006
+    servicePort: 80

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .ObjectMeta.Name }}
+  namespace: {{ .ObjectMeta.Namespace }}
+  labels:
+    app: {{ .ObjectMeta.Name }}
+    owner: xin_yan
+spec:
+  replicas: {{ .Spec.Replicas }}
+  selector:
+    matchLabels:
+      app: {{ .ObjectMeta.Name }}
+  template:
+    metadata:
+      name: {{ .ObjectMeta.Name }}
+      labels:
+        app: {{ .ObjectMeta.Name }}
+        owner: xin_yan
+    spec:
+      containers:
+        - name: {{ .ObjectMeta.Name }}
+          image: {{ .Spec.Image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ .Spec.Port }}
+              protocol: TCP
+      

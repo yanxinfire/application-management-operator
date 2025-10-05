@@ -1,0 +1,15 @@
+apiVersion: apps.xinyan.cn/v1alpha1
+kind: Application
+metadata:
+  labels:
+    owner: xin_yan
+  name: my-test-ing
+  namespace: my-test
+spec:
+  image: nginx
+  port: 80
+  replicas: 2
+  expose:
+    mode: Ingress
+    ingressDomain: www.nginx-test.com
+    servicePort: 80

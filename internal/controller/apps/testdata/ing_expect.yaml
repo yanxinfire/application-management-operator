@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-test-ing
+  namespace: my-test
+  labels:
+    app: my-test-ing
+    owner: xin_yan
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: www.nginx-test.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-test-ing
+                port:
+                  number: 80
