@@ -207,11 +207,12 @@ func (r *ApplicationReconciler) deleteIngress(ctx context.Context, app *appsv1al
 
 func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Application) error {
 	expose := app.Spec.Expose
-	if expose.Mode == "Ingress" {
+	switch expose.Mode {
+	case "Ingress":
 		if expose.IngressDomain == "" {
 			return fmt.Errorf("mode is Ingress but ingressDomain is empty")
 		}
-	} else if expose.Mode == "NodePort" {
+	case "Expose":
 		if expose.NodePort == 0 {
 			r.logger.Info("mode is NodePort and nodePort is not set, " +
 				"nodePort will be a random number between 30000 and 32767")
@@ -220,10 +221,8 @@ func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Applicat
 			return fmt.Errorf("invalid NodePort %d, "+
 				"must be between 30000–32767", expose.NodePort)
 		}
-	} else {
-		return fmt.Errorf("expose mode %s is not supported", expose.Mode)
 	}
-	return nil
+	return fmt.Errorf("expose mode %s is not supported", expose.Mode)
 }
 
 // SetupWithManager sets up the controller with the Manager.
