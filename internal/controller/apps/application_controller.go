@@ -212,7 +212,8 @@ func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Applicat
 		if expose.IngressDomain == "" {
 			return fmt.Errorf("mode is Ingress but ingressDomain is empty")
 		}
-	case "Expose":
+		return nil
+	case "NodePort":
 		if expose.NodePort == 0 {
 			r.logger.Info("mode is NodePort and nodePort is not set, " +
 				"nodePort will be a random number between 30000 and 32767")
@@ -221,6 +222,7 @@ func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Applicat
 			return fmt.Errorf("invalid NodePort %d, "+
 				"must be between 30000–32767", expose.NodePort)
 		}
+		return nil
 	}
 	return fmt.Errorf("expose mode %s is not supported", expose.Mode)
 }
