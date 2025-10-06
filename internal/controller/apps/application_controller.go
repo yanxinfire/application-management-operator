@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -65,26 +66,48 @@ func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	appCopy := app.DeepCopy()
+	appCopy.Status = appsv1alpha1.ApplicationStatus{
+		Deployment: "not ready",
+		Service:    "not ready",
+		Ingress:    "not ready",
+	}
 
 	if err := r.verifyApplicationMode(appCopy); err != nil {
+		appCopy.Status.Reason = err.Error()
+		_ = r.updateStatus(ctx, appCopy, app)
 		return ctrl.Result{}, err
 	}
 
 	if err := r.createOrUpdateDeployment(ctx, appCopy); err != nil {
+		appCopy.Status.Reason = err.Error()
+		_ = r.updateStatus(ctx, appCopy, app)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
 	if err := r.createOrUpdateService(ctx, appCopy); err != nil {
+		appCopy.Status.Reason = err.Error()
+		_ = r.updateStatus(ctx, appCopy, app)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
+	appCopy.Status.Service = "ready"
 	if app.Spec.Expose.Mode == "Ingress" {
 		if err := r.createOrUpdateIngress(ctx, appCopy); err != nil {
+			appCopy.Status.Reason = err.Error()
+			_ = r.updateStatus(ctx, appCopy, app)
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
+		appCopy.Status.Ingress = "ready"
 	} else {
 		if err := r.deleteIngress(ctx, appCopy); err != nil {
+			appCopy.Status.Reason = err.Error()
+			_ = r.updateStatus(ctx, appCopy, app)
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
+	}
+
+	err := r.updateStatus(ctx, appCopy, app)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: 10}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -120,6 +143,9 @@ func (r *ApplicationReconciler) createOrUpdateDeployment(
 		r.logger.Info("Updating Deployment", "Namespace",
 			app.Namespace, "Name", app.Name)
 		return r.Update(ctx, deployment)
+	}
+	if existingDeployment.Status.ReadyReplicas == app.Spec.Replicas {
+		app.Status.Deployment = "ready"
 	}
 	return nil
 }
@@ -203,6 +229,13 @@ func (r *ApplicationReconciler) deleteIngress(ctx context.Context, app *appsv1al
 	r.logger.Info("Deleting Ingress", "Namespace",
 		app.Namespace, "Name", app.Name)
 	return r.Delete(ctx, ingress)
+}
+
+func (r *ApplicationReconciler) updateStatus(ctx context.Context, appCopy, app *appsv1alpha1.Application) error {
+	if !reflect.DeepEqual(appCopy.Status, app.Status) {
+		return r.Status().Update(ctx, appCopy)
+	}
+	return nil
 }
 
 func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Application) error {

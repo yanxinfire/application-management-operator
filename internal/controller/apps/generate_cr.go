@@ -47,7 +47,7 @@ func NewDeployment(app *v1alpha1.Application) *appsv1.Deployment {
 					"app": app.Name,
 				},
 			},
-			Replicas: app.Spec.Replicas,
+			Replicas: &app.Spec.Replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   metaData.GetName(),

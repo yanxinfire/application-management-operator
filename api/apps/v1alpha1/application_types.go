@@ -40,7 +40,7 @@ type ApplicationSpec struct {
 	// Replicas refer to the desired number of identical copies (pods)
 	// of an application that should be running at any given time
 	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// StartCmd is the application start command
 	// +optional
@@ -87,28 +87,17 @@ type ApplicationStatus struct {
 	// For Kubernetes API conventions, see:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
 
-	// Phase is a high-level summary of where the application is in its lifecycle.
-	Phase string `json:"phase"`
+	// Deployment indicates if Deployment is ready or not ready.
+	Deployment string `json:"deployment"`
 
-	// Message indicates details about why the application is in this condition.
-	Message string `json:"message"`
+	// Service indicates if Service is ready or not ready.
+	Service string `json:"service"`
+
+	// Ingress indicates if Ingress is ready or not ready.
+	Ingress string `json:"ingress"`
 
 	// Reason indicates details about why the application is in this state.
 	Reason string `json:"reason"`
-
-	// Conditions represent the current state of the Application resource.
-	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
-	//
-	// Standard condition types include:
-	// - "Available": the resource is fully functional
-	// - "Progressing": the resource is being created or updated
-	// - "Degraded": the resource failed to reach or maintain its desired state
-	//
-	// The status of each condition is one of True, False, or Unknown.
-	// +listType=map
-	// +listMapKey=type
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
