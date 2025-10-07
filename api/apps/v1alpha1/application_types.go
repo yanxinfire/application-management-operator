@@ -42,14 +42,6 @@ type ApplicationSpec struct {
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// StartCmd is the application start command
-	// +optional
-	StartCmd string `json:"startCmd,omitempty"`
-
-	// Args are arguments used by the application
-	// +optional
-	Args []string `json:"args,omitempty"`
-
 	// Env is a list of environment variables used by the application
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`

@@ -66,6 +66,7 @@ func NewDeployment(app *v1alpha1.Application) *appsv1.Deployment {
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
+							Env: app.Spec.Env,
 						},
 					},
 				},

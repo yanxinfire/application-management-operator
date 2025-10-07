@@ -38,6 +38,11 @@ import (
 	appsv1alpha1 "github.com/yanxinfire/application-management-operator/api/apps/v1alpha1"
 )
 
+const (
+	STATUSREADY    = "ready"
+	STATUSNOTREADY = "not ready"
+)
+
 // ApplicationReconciler reconciles an Application object
 type ApplicationReconciler struct {
 	client.Client
@@ -67,45 +72,45 @@ func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	appCopy := app.DeepCopy()
 	appCopy.Status = appsv1alpha1.ApplicationStatus{
-		Deployment: "not ready",
-		Service:    "not ready",
-		Ingress:    "not ready",
+		Deployment: STATUSNOTREADY,
+		Service:    STATUSNOTREADY,
+		Ingress:    STATUSNOTREADY,
 	}
 
-	if err := r.verifyApplicationMode(appCopy); err != nil {
+	if err := r.VerifyApplicationMode(appCopy); err != nil {
 		appCopy.Status.Reason = err.Error()
-		_ = r.updateStatus(ctx, appCopy, app)
+		_ = r.UpdateStatus(ctx, appCopy, app)
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createOrUpdateDeployment(ctx, appCopy); err != nil {
+	if err := r.CreateOrUpdateDeployment(ctx, appCopy); err != nil {
 		appCopy.Status.Reason = err.Error()
-		_ = r.updateStatus(ctx, appCopy, app)
+		_ = r.UpdateStatus(ctx, appCopy, app)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
-	if err := r.createOrUpdateService(ctx, appCopy); err != nil {
+	if err := r.CreateOrUpdateService(ctx, appCopy); err != nil {
 		appCopy.Status.Reason = err.Error()
-		_ = r.updateStatus(ctx, appCopy, app)
+		_ = r.UpdateStatus(ctx, appCopy, app)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
-	appCopy.Status.Service = "ready"
+	appCopy.Status.Service = STATUSNOTREADY
 	if app.Spec.Expose.Mode == "Ingress" {
 		if err := r.createOrUpdateIngress(ctx, appCopy); err != nil {
 			appCopy.Status.Reason = err.Error()
-			_ = r.updateStatus(ctx, appCopy, app)
+			_ = r.UpdateStatus(ctx, appCopy, app)
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
-		appCopy.Status.Ingress = "ready"
+		appCopy.Status.Ingress = STATUSNOTREADY
 	} else {
-		if err := r.deleteIngress(ctx, appCopy); err != nil {
+		if err := r.DeleteIngress(ctx, appCopy); err != nil {
 			appCopy.Status.Reason = err.Error()
-			_ = r.updateStatus(ctx, appCopy, app)
+			_ = r.UpdateStatus(ctx, appCopy, app)
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 		}
 	}
 
-	err := r.updateStatus(ctx, appCopy, app)
+	err := r.UpdateStatus(ctx, appCopy, app)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: 10}, err
 	}
@@ -113,7 +118,7 @@ func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
-func (r *ApplicationReconciler) createOrUpdateDeployment(
+func (r *ApplicationReconciler) CreateOrUpdateDeployment(
 	ctx context.Context, app *appsv1alpha1.Application) error {
 	deployment := NewDeployment(app)
 	err := controllerutil.SetControllerReference(app, deployment, r.Scheme)
@@ -145,12 +150,12 @@ func (r *ApplicationReconciler) createOrUpdateDeployment(
 		return r.Update(ctx, deployment)
 	}
 	if existingDeployment.Status.ReadyReplicas == app.Spec.Replicas {
-		app.Status.Deployment = "ready"
+		app.Status.Deployment = STATUSNOTREADY
 	}
 	return nil
 }
 
-func (r *ApplicationReconciler) createOrUpdateService(
+func (r *ApplicationReconciler) CreateOrUpdateService(
 	ctx context.Context, app *appsv1alpha1.Application) error {
 	service := NewService(app)
 	err := controllerutil.SetControllerReference(app, service, r.Scheme)
@@ -215,7 +220,7 @@ func (r *ApplicationReconciler) createOrUpdateIngress(
 	return nil
 }
 
-func (r *ApplicationReconciler) deleteIngress(ctx context.Context, app *appsv1alpha1.Application) error {
+func (r *ApplicationReconciler) DeleteIngress(ctx context.Context, app *appsv1alpha1.Application) error {
 	ingress := &networkingv1.Ingress{}
 	if err := r.Get(ctx, types.NamespacedName{
 		Namespace: app.Namespace,
@@ -231,14 +236,15 @@ func (r *ApplicationReconciler) deleteIngress(ctx context.Context, app *appsv1al
 	return r.Delete(ctx, ingress)
 }
 
-func (r *ApplicationReconciler) updateStatus(ctx context.Context, appCopy, app *appsv1alpha1.Application) error {
+func (r *ApplicationReconciler) UpdateStatus(ctx context.Context, appCopy, app *appsv1alpha1.Application) error {
 	if !reflect.DeepEqual(appCopy.Status, app.Status) {
-		return r.Status().Update(ctx, appCopy)
+		// return r.Status().Update(ctx, appCopy)
+		return r.Update(ctx, appCopy)
 	}
 	return nil
 }
 
-func (r *ApplicationReconciler) verifyApplicationMode(app *appsv1alpha1.Application) error {
+func (r *ApplicationReconciler) VerifyApplicationMode(app *appsv1alpha1.Application) error {
 	expose := app.Spec.Expose
 	switch expose.Mode {
 	case "Ingress":

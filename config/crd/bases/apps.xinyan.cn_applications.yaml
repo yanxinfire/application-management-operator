@@ -39,11 +39,6 @@ spec:
           spec:
             description: spec defines the desired state of Application
             properties:
-              args:
-                description: Args are arguments used by the application
-                items:
-                  type: string
-                type: array
               env:
                 description: Env is a list of environment variables used by the application
                 items:
@@ -201,9 +196,6 @@ spec:
                   of an application that should be running at any given time
                 format: int32
                 type: integer
-              startCmd:
-                description: StartCmd is the application start command
-                type: string
             required:
             - expose
             - image
